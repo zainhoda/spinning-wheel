@@ -5607,6 +5607,179 @@ Elm.Mouse.make = function (_elm) {
    var y = A2($Signal.map,$Basics.snd,position);
    return _elm.Mouse.values = {_op: _op,position: position,x: x,y: y,isDown: isDown,clicks: clicks};
 };Elm.Native = Elm.Native || {};
+Elm.Native.Touch = {};
+Elm.Native.Touch.make = function(localRuntime) {
+	localRuntime.Native = localRuntime.Native || {};
+	localRuntime.Native.Touch = localRuntime.Native.Touch || {};
+	if (localRuntime.Native.Touch.values)
+	{
+		return localRuntime.Native.Touch.values;
+	}
+
+	var Signal = Elm.Signal.make(localRuntime);
+	var NS = Elm.Native.Signal.make(localRuntime);
+	var List = Elm.Native.List.make(localRuntime);
+	var Utils = Elm.Native.Utils.make(localRuntime);
+
+	function Dict() {
+		this.keys = [];
+		this.values = [];
+
+		this.insert = function(key, value) {
+			this.keys.push(key);
+			this.values.push(value);
+		};
+		this.lookup = function(key) {
+			var i = this.keys.indexOf(key);
+			return i >= 0 ? this.values[i] : {x: 0, y: 0, t: 0};
+		};
+		this.remove = function(key) {
+			var i = this.keys.indexOf(key);
+			if (i < 0) return;
+			var t = this.values[i];
+			this.keys.splice(i, 1);
+			this.values.splice(i, 1);
+			return t;
+		};
+		this.clear = function() {
+			this.keys = [];
+			this.values = [];
+		};
+	}
+
+	var root = NS.input('touch', []),
+		tapTime = 500,
+		hasTap = false,
+		tap = { x: 0, y: 0},
+		dict = new Dict();
+
+	function touch(t) {
+		var r = dict.lookup(t.identifier);
+		var point = Utils.getXY(t);
+		return {
+			id: t.identifier,
+			x: point._0,
+			y: point._1,
+			x0: r.x,
+			y0: r.y,
+			t0: r.t
+		 };
+	}
+
+	var node = localRuntime.isFullscreen()
+		? document
+		: localRuntime.node;
+
+	function start(e) {
+		var point = Utils.getXY(e);
+		dict.insert(e.identifier, {
+			x: point._0,
+			y: point._1,
+			t: localRuntime.timer.now()
+		});
+	}
+	function end(e) {
+		var t = dict.remove(e.identifier);
+		if (localRuntime.timer.now() - t.t < tapTime)
+		{
+			hasTap = true;
+			tap = {
+				x: t.x,
+				y: t.y
+			};
+		}
+	}
+
+	function listen(name, f) {
+		function update(e) {
+			for (var i = e.changedTouches.length; i--; ) {
+				f(e.changedTouches[i]);
+			}
+			var ts = new Array(e.touches.length);
+			for (var i = e.touches.length; i--; ) {
+				ts[i] = touch(e.touches[i]);
+			}
+			localRuntime.notify(root.id, ts);
+			e.preventDefault();
+		}
+		localRuntime.addListener([root.id], node, name, update);
+	}
+
+	listen('touchstart', start);
+	listen('touchmove', function(_) {});
+	listen('touchend', end);
+	listen('touchcancel', end);
+	listen('touchleave', end);
+
+	var mouseID = -1;
+	function move(e) {
+		var point = Utils.getXY(e);
+		for (var i = root.value.length; i--; ) {
+			if (root.value[i].id === mouseID)
+			{
+				root.value[i].x = point._0;
+				root.value[i].y = point._1;
+				localRuntime.notify(root.id, root.value);
+				break;
+			}
+		}
+	}
+	localRuntime.addListener([root.id], node, 'mousedown', function down(e) {
+		node.addEventListener('mousemove', move);
+		e.identifier = mouseID;
+		start(e);
+		root.value.push(touch(e));
+		localRuntime.notify(root.id, root.value);
+	});
+	localRuntime.addListener([root.id], document, 'mouseup', function up(e) {
+		node.removeEventListener('mousemove', move);
+		e.identifier = mouseID;
+		end(e);
+		for (var i = root.value.length; i--; ) {
+			if (root.value[i].id === mouseID)
+			{
+				root.value.splice(i, 1);
+				--mouseID;
+				break;
+			}
+		}
+		localRuntime.notify(root.id, root.value);
+	});
+	localRuntime.addListener([root.id], node, 'blur', function blur(e) {
+		node.removeEventListener('mousemove', move);
+		if (root.value.length > 0)
+		{
+			localRuntime.notify(root.id, []);
+			--mouseID;
+		}
+		dict.clear();
+	});
+
+	function dependency(f) {
+		var sig = A2( Signal.map, f, root );
+		root.defaultNumberOfKids += 1;
+		sig.defaultNumberOfKids = 0;
+		return sig;
+	}
+
+	var touches = dependency(List.fromArray);
+
+	var taps = function() {
+		var sig = dependency(function(_) { return tap; });
+		sig.defaultNumberOfKids = 1;
+		function pred(_) {
+			var b = hasTap;
+			hasTap = false;
+			return b;
+		}
+		var sig2 = A3(Signal.filter, pred, {x: 0, y: 0}, sig);
+		sig2.defaultNumberOfKids = 0;
+		return sig2;
+	}();
+
+	return localRuntime.Native.Touch.values = { touches: touches, taps: taps };
+};
+Elm.Native = Elm.Native || {};
 Elm.Native.Window = {};
 Elm.Native.Window.make = function make(localRuntime) {
 	localRuntime.Native = localRuntime.Native || {};
@@ -5673,7 +5846,18 @@ Elm.Native.Window.make = function make(localRuntime) {
 		resizeIfNeeded: resizeIfNeeded
 	};
 };
-Elm.Window = Elm.Window || {};
+Elm.Touch = Elm.Touch || {};
+Elm.Touch.make = function (_elm) {
+   "use strict";
+   _elm.Touch = _elm.Touch || {};
+   if (_elm.Touch.values) return _elm.Touch.values;
+   var _U = Elm.Native.Utils.make(_elm),$Native$Touch = Elm.Native.Touch.make(_elm),$Signal = Elm.Signal.make(_elm),$Time = Elm.Time.make(_elm);
+   var _op = {};
+   var taps = $Native$Touch.taps;
+   var touches = $Native$Touch.touches;
+   var Touch = F6(function (a,b,c,d,e,f) {    return {x: a,y: b,id: c,x0: d,y0: e,t0: f};});
+   return _elm.Touch.values = {_op: _op,touches: touches,taps: taps,Touch: Touch};
+};Elm.Window = Elm.Window || {};
 Elm.Window.make = function (_elm) {
    "use strict";
    _elm.Window = _elm.Window || {};
@@ -5701,6 +5885,7 @@ Elm.Main.make = function (_elm) {
    $Result = Elm.Result.make(_elm),
    $Signal = Elm.Signal.make(_elm),
    $Time = Elm.Time.make(_elm),
+   $Touch = Elm.Touch.make(_elm),
    $Window = Elm.Window.make(_elm);
    var _op = {};
    var hand = F4(function (clr,len,time,velocity) {
@@ -5736,10 +5921,20 @@ Elm.Main.make = function (_elm) {
            2) + Math.pow($Basics.snd(model.startMousePosition) - $Basics.snd(model.endMousePosition),2)))});
          case "NewTime": return _U.update(model,
            {t: model.t + model.velocity,velocity: _U.cmp(model.velocity,5.0e-2) > 0 ? model.velocity * frictionFactor : 0});
-         default: return _U.update(model,{windowSize: _p0._0});}
+         case "WindowSize": return _U.update(model,{windowSize: _p0._0});
+         default: var hd = $List.head(_p0._0);
+           var _p2 = hd;
+           if (_p2.ctor === "Just") {
+                 var _p3 = _p2._0;
+                 return _U.update(model,
+                 {velocity: model.velocity + mousePushFactor * $Basics.sqrt($Basics.toFloat(Math.pow(_p3.x0 - _p3.x,2) + Math.pow(_p3.y0 - _p3.y,2)))});
+              } else {
+                 return model;
+              }}
    });
    var Model = F6(function (a,b,c,d,e,f) {    return {t: a,velocity: b,startMousePosition: c,endMousePosition: d,windowSize: e,mouseIsDown: f};});
    var init = A6(Model,0,200,{ctor: "_Tuple2",_0: 0,_1: 0},{ctor: "_Tuple2",_0: 0,_1: 0},{ctor: "_Tuple2",_0: 400,_1: 400},false);
+   var Touched = function (a) {    return {ctor: "Touched",_0: a};};
    var WindowSize = function (a) {    return {ctor: "WindowSize",_0: a};};
    var NewTime = function (a) {    return {ctor: "NewTime",_0: a};};
    var MouseUp = {ctor: "MouseUp"};
@@ -5748,7 +5943,8 @@ Elm.Main.make = function (_elm) {
    var signal = $Signal.mergeMany(_U.list([A2($Signal.map,MousePosition,$Mouse.position)
                                           ,A2($Signal.map,function (upDown) {    return upDown ? MouseDown : MouseUp;},$Mouse.isDown)
                                           ,A2($Signal.map,NewTime,$Time.every($Time.millisecond))
-                                          ,A2($Signal.map,WindowSize,$Window.dimensions)]));
+                                          ,A2($Signal.map,WindowSize,$Window.dimensions)
+                                          ,A2($Signal.map,Touched,$Touch.touches)]));
    var main = A2($Signal.map,view,A3($Signal.foldp,update,init,signal));
    return _elm.Main.values = {_op: _op
                              ,MousePosition: MousePosition
@@ -5756,6 +5952,7 @@ Elm.Main.make = function (_elm) {
                              ,MouseUp: MouseUp
                              ,NewTime: NewTime
                              ,WindowSize: WindowSize
+                             ,Touched: Touched
                              ,Model: Model
                              ,frictionFactor: frictionFactor
                              ,mousePushFactor: mousePushFactor

@@ -4,12 +4,14 @@ import Graphics.Element exposing (..)
 import Time exposing (..)
 import Mouse
 import Window
+import Touch
 
 type Action = MousePosition (Int, Int)
             | MouseDown
             | MouseUp
             | NewTime Float
             | WindowSize (Int, Int)
+            | Touched (List Touch.Touch)
 
 type alias Model = { t: Float
                    , velocity: Float
@@ -47,6 +49,7 @@ signal =
     ,Signal.map (\upDown -> if upDown then MouseDown else MouseUp) Mouse.isDown
     ,Signal.map NewTime (every millisecond)
     ,Signal.map WindowSize Window.dimensions
+    ,Signal.map Touched Touch.touches
     ]
     )
 
@@ -58,7 +61,10 @@ update action model =
     MouseUp -> {model | mouseIsDown = False, velocity = model.velocity + mousePushFactor * sqrt(toFloat ( ((fst model.startMousePosition)-(fst model.endMousePosition))^2 + ((snd model.startMousePosition) - (snd model.endMousePosition))^2 )) }
     NewTime t -> {model | t = model.t+model.velocity, velocity = if model.velocity > 0.05 then model.velocity * frictionFactor else 0}
     WindowSize size -> {model | windowSize = size}
-
+    Touched touchList -> let hd = List.head touchList in
+                           case hd of
+                                   Just touch -> {model | velocity = model.velocity + mousePushFactor * sqrt(toFloat ( (touch.x0-touch.x)^2 + (touch.y0 - touch.y)^2 )) }
+                                   Nothing -> model
 view : Model -> Element
 view model =
   collage (fst model.windowSize) (snd model.windowSize)
