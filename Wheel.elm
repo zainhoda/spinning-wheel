@@ -13,7 +13,8 @@ type Action = MousePosition (Int, Int)
 
 type alias Model = { t: Float
                    , velocity: Float
-                   , lastMousePosition: (Int, Int)
+                   , startMousePosition: (Int, Int)
+                   , endMousePosition: (Int, Int)
                    , windowSize: (Int, Int)
                    , mouseIsDown: Bool
                     }
@@ -21,9 +22,19 @@ type alias Model = { t: Float
 frictionFactor : Float
 frictionFactor = 0.995
 
+mousePushFactor : Float
+mousePushFactor = 2
+
+radius : Model -> Float
+radius model =
+  let x = fst model.windowSize
+      y = snd model.windowSize
+  in
+    if x < y then (toFloat x)/2 else (toFloat y)/2
+
 init : Model
 init =
-  Model 0 200 (0, 0) (400, 400) False
+  Model 0 200 (0, 0) (0, 0) (400, 400) False
 
 main : Signal Element
 main =
@@ -42,18 +53,18 @@ signal =
 update : Action -> Model -> Model
 update action model =
   case action of
-    MousePosition pos -> {model | lastMousePosition = pos}
-    MouseDown -> {model | mouseIsDown = True, velocity = model.velocity * 2}
-    MouseUp -> {model | mouseIsDown = False}
+    MousePosition pos -> if model.mouseIsDown then {model | startMousePosition = pos} else {model | endMousePosition = pos}
+    MouseDown -> {model | mouseIsDown = True}
+    MouseUp -> {model | mouseIsDown = False, velocity = model.velocity + mousePushFactor * sqrt(toFloat ( ((fst model.startMousePosition)-(fst model.endMousePosition))^2 + ((snd model.startMousePosition) - (snd model.endMousePosition))^2 )) }
     NewTime t -> {model | t = model.t+model.velocity, velocity = if model.velocity > 0.05 then model.velocity * frictionFactor else 0}
     WindowSize size -> {model | windowSize = size}
 
 view : Model -> Element
 view model =
   collage (fst model.windowSize) (snd model.windowSize)
-    [ filled lightGrey (circle 110)
-    , outlined (solid grey) (circle 110)
-    , hand orange 100 model.t model.velocity
+    [ filled lightGrey (circle (radius model))
+    , outlined (solid grey) (circle (radius model))
+    , hand orange (radius model - 10) model.t model.velocity
     ]
 
 
