@@ -12,8 +12,8 @@ main =
 clock : Float -> Element
 clock t =
   collage 400 400
-    [ filled lightGrey (ngon 12 110)
-    , outlined (solid grey) (ngon 12 110)
+    [ filled lightGrey (circle 110)
+    , outlined (solid grey) (circle 110)
     , hand orange 100 t 20
     ]
 
