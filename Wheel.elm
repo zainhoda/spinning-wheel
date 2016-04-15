@@ -36,7 +36,7 @@ radius model =
 
 init : Model
 init =
-  Model 0 200 (0, 0) (0, 0) (400, 400) False
+  Model 0 200 (0, 0) (0, 0) (800, 800) False
 
 main : Signal Element
 main =
@@ -70,14 +70,18 @@ view model =
   collage (fst model.windowSize) (snd model.windowSize)
     [ filled lightGrey (circle (radius model))
     , outlined (solid grey) (circle (radius model))
-    , hand orange (radius model - 10) model.t model.velocity
+    , hand orange (radius model - 10) model.t 0
+    , hand blue (radius model - 10) model.t 2
+    , hand green (radius model - 10) model.t 4
     ]
 
 
 hand : Color -> Float -> Float -> Float -> Form
-hand clr len time velocity =
+hand clr len time offset =
   let
-    angle = degrees (90 - 6 * inSeconds time)
+    startAngle = degrees (60 * offset + 90 - 6 * inSeconds time)
+    endAngle = startAngle + (degrees 60)
   in
-    segment (0,0) (fromPolar (len,angle))
-      |> traced (solid clr)
+    --segment (0,0) (fromPolar (len,angle))
+    polygon [(0,0), (fromPolar (len,startAngle)), (fromPolar (len,endAngle))]
+      |> filled clr

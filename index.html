@@ -5888,11 +5888,14 @@ Elm.Main.make = function (_elm) {
    $Touch = Elm.Touch.make(_elm),
    $Window = Elm.Window.make(_elm);
    var _op = {};
-   var hand = F4(function (clr,len,time,velocity) {
-      var angle = $Basics.degrees(90 - 6 * $Time.inSeconds(time));
-      return A2($Graphics$Collage.traced,
-      $Graphics$Collage.solid(clr),
-      A2($Graphics$Collage.segment,{ctor: "_Tuple2",_0: 0,_1: 0},$Basics.fromPolar({ctor: "_Tuple2",_0: len,_1: angle})));
+   var hand = F4(function (clr,len,time,offset) {
+      var startAngle = $Basics.degrees(60 * offset + 90 - 6 * $Time.inSeconds(time));
+      var endAngle = startAngle + $Basics.degrees(60);
+      return A2($Graphics$Collage.filled,
+      clr,
+      $Graphics$Collage.polygon(_U.list([{ctor: "_Tuple2",_0: 0,_1: 0}
+                                        ,$Basics.fromPolar({ctor: "_Tuple2",_0: len,_1: startAngle})
+                                        ,$Basics.fromPolar({ctor: "_Tuple2",_0: len,_1: endAngle})])));
    });
    var radius = function (model) {
       var y = $Basics.snd(model.windowSize);
@@ -5905,7 +5908,9 @@ Elm.Main.make = function (_elm) {
       $Basics.snd(model.windowSize),
       _U.list([A2($Graphics$Collage.filled,$Color.lightGrey,$Graphics$Collage.circle(radius(model)))
               ,A2($Graphics$Collage.outlined,$Graphics$Collage.solid($Color.grey),$Graphics$Collage.circle(radius(model)))
-              ,A4(hand,$Color.orange,radius(model) - 10,model.t,model.velocity)]));
+              ,A4(hand,$Color.orange,radius(model) - 10,model.t,0)
+              ,A4(hand,$Color.blue,radius(model) - 10,model.t,2)
+              ,A4(hand,$Color.green,radius(model) - 10,model.t,4)]));
    };
    var mousePushFactor = 2;
    var frictionFactor = 0.995;
@@ -5933,7 +5938,7 @@ Elm.Main.make = function (_elm) {
               }}
    });
    var Model = F6(function (a,b,c,d,e,f) {    return {t: a,velocity: b,startMousePosition: c,endMousePosition: d,windowSize: e,mouseIsDown: f};});
-   var init = A6(Model,0,200,{ctor: "_Tuple2",_0: 0,_1: 0},{ctor: "_Tuple2",_0: 0,_1: 0},{ctor: "_Tuple2",_0: 400,_1: 400},false);
+   var init = A6(Model,0,200,{ctor: "_Tuple2",_0: 0,_1: 0},{ctor: "_Tuple2",_0: 0,_1: 0},{ctor: "_Tuple2",_0: 800,_1: 800},false);
    var Touched = function (a) {    return {ctor: "Touched",_0: a};};
    var WindowSize = function (a) {    return {ctor: "WindowSize",_0: a};};
    var NewTime = function (a) {    return {ctor: "NewTime",_0: a};};
